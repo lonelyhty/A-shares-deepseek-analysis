@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eef3f8;
+  --foreground: #0f172a;
+  --panel: #ffffff;
+  --panel-muted: #f6f9fc;
+  --border: #d7e1ea;
+  --muted: #64748b;
+  --accent: #0891b2;
+  --accent-strong: #0f766e;
+  --danger: #dc2626;
+  --success: #059669;
+  --warning: #d97706;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  background:
+    linear-gradient(135deg, rgba(8, 145, 178, 0.12), transparent 32%),
+    linear-gradient(225deg, rgba(15, 118, 110, 0.1), transparent 28%),
+    var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.q-card {
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 253, 0.96));
+  border-radius: 8px;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+  position: relative;
+}
+
+.q-card::before {
+  background: linear-gradient(90deg, rgba(8, 145, 178, 0.55), transparent 42%, rgba(20, 184, 166, 0.35));
+  content: "";
+  height: 1px;
+  left: 12px;
+  opacity: 0.55;
+  position: absolute;
+  right: 12px;
+  top: 0;
+}
+
+.q-grid-bg {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.q-shell-glow {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(34, 211, 238, 0.2), transparent 28%),
+    radial-gradient(circle at 82% 4%, rgba(45, 212, 191, 0.15), transparent 26%),
+    linear-gradient(135deg, #07111f 0%, #0f172a 48%, #102232 100%);
+}
+
+.q-tech-panel {
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  background: rgba(15, 23, 42, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.q-scrollbar {
+  scrollbar-color: #9aa7b2 transparent;
+  scrollbar-width: thin;
+}
+
+.q-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.q-scrollbar::-webkit-scrollbar-thumb {
+  background: #9aa7b2;
+  border-radius: 999px;
+}
