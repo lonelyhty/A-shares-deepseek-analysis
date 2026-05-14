@@ -14,6 +14,8 @@ const requestSchema = z.object({
   save: z.boolean().default(true),
 });
 
+export const maxDuration = 20;
+
 export async function POST(request: Request) {
   const { response, user, supabase } = await requireUser();
 

@@ -108,7 +108,7 @@ export class TushareProvider implements MarketDataProvider {
         fields,
       }),
       cache: "no-store",
-      timeoutMs: 8_000,
+      timeoutMs: 4_500,
     });
     const json = (await response.json()) as TushareResponse;
 
