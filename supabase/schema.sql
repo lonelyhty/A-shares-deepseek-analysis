@@ -71,6 +71,14 @@ alter table public.subscriptions enable row level security;
 alter table public.usage_counters enable row level security;
 alter table public.market_cache enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.watchlist to authenticated;
+grant select, insert on public.analysis_reports to authenticated;
+grant select, insert on public.usage_events to authenticated;
+grant select, insert, update on public.subscriptions to authenticated;
+grant select, insert, update on public.usage_counters to authenticated;
+grant select on public.market_cache to authenticated;
+
 drop policy if exists "watchlist owner select" on public.watchlist;
 create policy "watchlist owner select"
   on public.watchlist for select

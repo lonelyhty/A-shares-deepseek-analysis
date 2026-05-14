@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { isAdminEmail } from "@/lib/env";
 import { getPlanDailyLimit } from "@/lib/billing/plans";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { SubscriptionPlan, UserSubscription } from "@/lib/types";
 
 const ANALYSIS_EVENT = "analysis.run";
@@ -51,9 +52,10 @@ export async function getEntitlementState(
   supabase: SupabaseClient,
   user: User,
 ): Promise<EntitlementState> {
-  const subscription = await getOrCreateSubscription(supabase, user);
+  const db = createAdminClient() ?? supabase;
+  const subscription = await getOrCreateSubscription(db, user);
   const usageDate = todayKey();
-  const { data } = await supabase
+  const { data } = await db
     .from("usage_counters")
     .select("*")
     .eq("user_id", user.id)
@@ -77,8 +79,9 @@ export async function incrementAnalysisUsage(
   supabase: SupabaseClient,
   user: User,
 ) {
+  const db = createAdminClient() ?? supabase;
   const usageDate = todayKey();
-  const { data } = await supabase
+  const { data } = await db
     .from("usage_counters")
     .select("*")
     .eq("user_id", user.id)
@@ -87,7 +90,7 @@ export async function incrementAnalysisUsage(
     .maybeSingle();
 
   if (data) {
-    await supabase
+    await db
       .from("usage_counters")
       .update({
         count: Number(data.count ?? 0) + 1,
@@ -97,7 +100,7 @@ export async function incrementAnalysisUsage(
     return;
   }
 
-  await supabase.from("usage_counters").insert({
+  await db.from("usage_counters").insert({
     user_id: user.id,
     usage_date: usageDate,
     event_type: ANALYSIS_EVENT,
