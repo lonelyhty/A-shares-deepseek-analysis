@@ -1,7 +1,14 @@
 grant usage on schema public to anon, authenticated;
+grant usage on schema public to service_role;
 grant select, insert, update, delete on public.watchlist to authenticated;
 grant select, insert on public.analysis_reports to authenticated;
 grant select, insert on public.usage_events to authenticated;
 grant select, insert, update on public.subscriptions to authenticated;
 grant select, insert, update on public.usage_counters to authenticated;
 grant select on public.market_cache to authenticated;
+grant all on public.watchlist to service_role;
+grant all on public.analysis_reports to service_role;
+grant all on public.usage_events to service_role;
+grant all on public.subscriptions to service_role;
+grant all on public.usage_counters to service_role;
+grant all on public.market_cache to service_role;
