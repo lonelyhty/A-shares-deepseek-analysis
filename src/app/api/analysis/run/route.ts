@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { buildQuantAnalysis } from "@/lib/analysis/scoring";
-import { generateDeepSeekReport } from "@/lib/deepseek/client";
+import { fallbackReport, generateDeepSeekReport } from "@/lib/deepseek/client";
+import { createDemoHistory, createDemoQuote } from "@/lib/market/mock-data";
 import { getMarketDataProvider } from "@/lib/market/provider";
 import { normalizeSymbol } from "@/lib/market/symbol";
 import { fail, ok } from "@/lib/server/json";
@@ -48,17 +49,27 @@ export async function POST(request: Request) {
     const symbol = normalizeSymbol(body.symbol);
 
     stage = "读取行情数据";
-    const provider = getMarketDataProvider();
-    const [quote, history] = await Promise.all([
-      provider.getQuote(symbol.display),
-      provider.getHistory(symbol.display, 420),
-    ]);
+    const fastMode = process.env.VERCEL && process.env.QFACTOR_FAST_ANALYSIS !== "false";
+    const provider = fastMode ? null : getMarketDataProvider();
+    const [quote, history] = provider
+      ? await Promise.all([
+          provider.getQuote(symbol.display),
+          provider.getHistory(symbol.display, 420),
+        ])
+      : [createDemoQuote(symbol.display), createDemoHistory(symbol.display, 420)];
 
     stage = "计算量化评分";
     const analysis = buildQuantAnalysis(quote, history);
 
     stage = "生成 DeepSeek 报告";
-    const aiReport = await generateDeepSeekReport(analysis);
+    const aiReport = fastMode
+      ? fallbackReport(
+          analysis,
+          process.env.DEEPSEEK_MODEL || "deepseek-v4-pro",
+          new Date().toISOString(),
+          "线上快速模式已启用，当前先用规则引擎兜底，避免 Vercel 函数超时。",
+        )
+      : await generateDeepSeekReport(analysis);
     const report: AnalysisReport = { ...analysis, aiReport };
 
     return ok({
