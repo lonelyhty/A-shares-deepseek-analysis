@@ -7,6 +7,7 @@ import { AnalysisLoadingOverlay } from "@/components/dashboard/analysis-loading-
 import { AnalysisPanels } from "@/components/dashboard/analysis-panels";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { saveLocalReport } from "@/lib/client-storage";
 import type { AnalysisReport } from "@/lib/types";
 
 type AnalysisResponse = {
@@ -50,6 +51,7 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         throw new Error(json.error || "分析失败，请稍后重试。");
       }
 
+      saveLocalReport(json.report);
       setReport(json.report);
     } catch (requestError) {
       setError(

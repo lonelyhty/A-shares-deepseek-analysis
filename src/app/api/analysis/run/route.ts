@@ -6,8 +6,7 @@ import { normalizeSymbol } from "@/lib/market/symbol";
 import { fail, ok } from "@/lib/server/json";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/auth";
-import { getEntitlementState, incrementAnalysisUsage } from "@/lib/billing/entitlements";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { fallbackEntitlementState } from "@/lib/billing/entitlements";
 import type { AnalysisReport } from "@/lib/types";
 
 const requestSchema = z.object({
@@ -19,7 +18,7 @@ export const maxDuration = 30;
 
 export async function POST(request: Request) {
   let stage = "初始化";
-  const { response, user, supabase } = await requireUser();
+  const { response, user } = await requireUser();
 
   if (response || !user) {
     return response;
@@ -35,8 +34,8 @@ export async function POST(request: Request) {
     stage = "读取请求";
     const body = requestSchema.parse(await request.json());
 
-    stage = "检查分析额度";
-    const entitlement = await getEntitlementState(supabase, user);
+    stage = "应用默认额度";
+    const entitlement = fallbackEntitlementState(user);
 
     if (!entitlement.allowed) {
       return fail(
@@ -61,34 +60,6 @@ export async function POST(request: Request) {
     stage = "生成 DeepSeek 报告";
     const aiReport = await generateDeepSeekReport(analysis);
     const report: AnalysisReport = { ...analysis, aiReport };
-
-    if (body.save) {
-      stage = "保存分析结果";
-      const db = createAdminClient() ?? supabase;
-
-      await Promise.allSettled([
-        db.from("analysis_reports").insert({
-          user_id: user.id,
-          symbol: report.symbol,
-          name: report.quote.name,
-          signal: report.plan.signalLabel,
-          score: report.scores.total,
-          payload: report,
-        }),
-        db.from("usage_events").insert({
-          user_id: user.id,
-          event_type: "analysis.run",
-          metadata: {
-            symbol: report.symbol,
-            score: report.scores.total,
-            plan: entitlement.subscription.plan,
-            remainingBeforeRun: entitlement.remainingToday,
-          },
-        }),
-      ]);
-
-      await incrementAnalysisUsage(supabase, user);
-    }
 
     return ok({
       report,

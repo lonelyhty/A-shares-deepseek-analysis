@@ -60,7 +60,7 @@ export class EastmoneyProvider implements MarketDataProvider {
           "User-Agent": "Mozilla/5.0 QFactor",
         },
         cache: "no-store",
-        timeoutMs: 3_000,
+        timeoutMs: 1_200,
       });
       const json = (await response.json()) as EastmoneySearchResponse;
       const rows = json.QuotationCodeTable?.Data ?? [];
@@ -96,7 +96,7 @@ export class EastmoneyProvider implements MarketDataProvider {
           "User-Agent": "Mozilla/5.0 QFactor",
         },
         cache: "no-store",
-        timeoutMs: 3_500,
+        timeoutMs: 1_500,
       });
       const json = (await response.json()) as EastmoneyQuoteResponse;
       const data = json.data;
@@ -159,7 +159,7 @@ export class EastmoneyProvider implements MarketDataProvider {
           "User-Agent": "Mozilla/5.0 QFactor",
         },
         cache: "no-store",
-        timeoutMs: 4_500,
+        timeoutMs: 1_800,
       });
       const json = (await response.json()) as EastmoneyKlineResponse;
       const klines = json.data?.klines ?? [];

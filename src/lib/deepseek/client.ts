@@ -67,7 +67,7 @@ export async function generateDeepSeekReport(analysis: QuantAnalysis): Promise<D
           },
         ],
       }),
-      timeoutMs: 6_000,
+      timeoutMs: 2_000,
     });
 
     if (!response.ok) {
