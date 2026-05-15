@@ -2,7 +2,13 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAdminEmails, getDeepSeekStatus, isAdminEmail, isSupabaseConfigured } from "@/lib/env";
+import {
+  getAdminEmails,
+  getDeepSeekStatus,
+  isAdminEmail,
+  isSupabaseAdminConfigured,
+  isSupabaseConfigured,
+} from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { Settings } from "lucide-react";
 
@@ -32,6 +38,7 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <SettingRow label="Supabase" value={isSupabaseConfigured() ? "已配置" : "未配置"} />
+              <SettingRow label="Supabase Server Key" value={isSupabaseAdminConfigured() ? "configured" : "missing"} />
               <SettingRow label="DeepSeek API Key" value={deepseek.configured ? "已配置" : "未配置"} />
               <SettingRow label="DeepSeek Base URL" value={deepseek.baseUrl} />
               <SettingRow label="DeepSeek Model" value={deepseek.model} />

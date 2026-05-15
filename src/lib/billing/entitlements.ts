@@ -19,63 +19,93 @@ export async function getOrCreateSubscription(
 ): Promise<UserSubscription> {
   const plan: SubscriptionPlan = isAdminEmail(user.email) ? "admin" : "free";
   const limit = getPlanDailyLimit(plan);
-  const { data, error: selectError } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
 
-  if (data) {
-    return normalizeSubscription(data as UserSubscription, user.email);
-  }
+  let existing: UserSubscription | null = null;
 
-  if (selectError) {
+  try {
+    const { data, error: selectError } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (selectError) {
+      return fallbackSubscription(user, plan, limit);
+    }
+
+    existing = data as UserSubscription | null;
+  } catch {
     return fallbackSubscription(user, plan, limit);
   }
 
-  const { data: inserted, error } = await supabase
-    .from("subscriptions")
-    .insert({
-      user_id: user.id,
-      plan,
-      status: "active",
-      analysis_daily_limit: limit,
-      metadata: { source: "auto-created" },
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return fallbackSubscription(user, plan, limit);
+  if (existing) {
+    return normalizeSubscription(existing, user.email);
   }
 
-  return inserted as UserSubscription;
+  try {
+    const { data: inserted, error } = await supabase
+      .from("subscriptions")
+      .insert({
+        user_id: user.id,
+        plan,
+        status: "active",
+        analysis_daily_limit: limit,
+        metadata: { source: "auto-created" },
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return fallbackSubscription(user, plan, limit);
+    }
+
+    return inserted as UserSubscription;
+  } catch {
+    return fallbackSubscription(user, plan, limit);
+  }
 }
 
 export async function getEntitlementState(
   supabase: SupabaseClient,
   user: User,
 ): Promise<EntitlementState> {
-  const db = createAdminClient() ?? supabase;
-  const subscription = await getOrCreateSubscription(db, user);
-  const usageDate = todayKey();
-  const { data, error: usageError } = await db
-    .from("usage_counters")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("usage_date", usageDate)
-    .eq("event_type", ANALYSIS_EVENT)
-    .maybeSingle();
+  try {
+    const db = createAdminClient() ?? supabase;
+    const subscription = await getOrCreateSubscription(db, user);
+    const usageDate = todayKey();
+    const { data, error: usageError } = await db
+      .from("usage_counters")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("usage_date", usageDate)
+      .eq("event_type", ANALYSIS_EVENT)
+      .maybeSingle();
 
-  const usedToday = usageError ? 0 : Number(data?.count ?? 0);
-  const limit = Number(subscription.analysis_daily_limit ?? getPlanDailyLimit(subscription.plan));
-  const remainingToday = Math.max(0, limit - usedToday);
+    const usedToday = usageError ? 0 : Number(data?.count ?? 0);
+    const limit = Number(subscription.analysis_daily_limit ?? getPlanDailyLimit(subscription.plan));
+    const remainingToday = Math.max(0, limit - usedToday);
+
+    return {
+      subscription,
+      usedToday,
+      remainingToday,
+      allowed: isSubscriptionActive(subscription) && remainingToday > 0,
+    };
+  } catch {
+    return fallbackEntitlementState(user);
+  }
+}
+
+export function fallbackEntitlementState(user: User): EntitlementState {
+  const plan: SubscriptionPlan = isAdminEmail(user.email) ? "admin" : "free";
+  const limit = getPlanDailyLimit(plan);
+  const subscription = fallbackSubscription(user, plan, limit);
 
   return {
     subscription,
-    usedToday,
-    remainingToday,
-    allowed: isSubscriptionActive(subscription) && remainingToday > 0,
+    usedToday: 0,
+    remainingToday: limit,
+    allowed: true,
   };
 }
 
@@ -83,37 +113,41 @@ export async function incrementAnalysisUsage(
   supabase: SupabaseClient,
   user: User,
 ) {
-  const db = createAdminClient() ?? supabase;
-  const usageDate = todayKey();
-  const { data, error: selectError } = await db
-    .from("usage_counters")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("usage_date", usageDate)
-    .eq("event_type", ANALYSIS_EVENT)
-    .maybeSingle();
-
-  if (selectError) {
-    return;
-  }
-
-  if (data) {
-    await db
+  try {
+    const db = createAdminClient() ?? supabase;
+    const usageDate = todayKey();
+    const { data, error: selectError } = await db
       .from("usage_counters")
-      .update({
-        count: Number(data.count ?? 0) + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", data.id);
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("usage_date", usageDate)
+      .eq("event_type", ANALYSIS_EVENT)
+      .maybeSingle();
+
+    if (selectError) {
+      return;
+    }
+
+    if (data) {
+      await db
+        .from("usage_counters")
+        .update({
+          count: Number(data.count ?? 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id);
+      return;
+    }
+
+    await db.from("usage_counters").insert({
+      user_id: user.id,
+      usage_date: usageDate,
+      event_type: ANALYSIS_EVENT,
+      count: 1,
+    });
+  } catch {
     return;
   }
-
-  await db.from("usage_counters").insert({
-    user_id: user.id,
-    usage_date: usageDate,
-    event_type: ANALYSIS_EVENT,
-    count: 1,
-  });
 }
 
 function normalizeSubscription(subscription: UserSubscription, email?: string | null) {

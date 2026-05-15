@@ -33,6 +33,13 @@ export function isSupabaseConfigured() {
   );
 }
 
+export function isSupabaseAdminConfigured() {
+  return hasValue(process.env.SUPABASE_SERVICE_ROLE_KEY, [
+    "your-supabase-service-role-key-for-admin-api-only",
+    "your-supabase",
+  ]);
+}
+
 export function getDeepSeekStatus() {
   return {
     configured: hasValue(process.env.DEEPSEEK_API_KEY, ["sk-your-deepseek-api-key"]),
