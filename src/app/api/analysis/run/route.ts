@@ -4,6 +4,7 @@ import { fallbackReport, generateDeepSeekReport } from "@/lib/deepseek/client";
 import { createDemoHistory, createDemoQuote } from "@/lib/market/mock-data";
 import { getMarketDataProvider } from "@/lib/market/provider";
 import { normalizeSymbol } from "@/lib/market/symbol";
+import { YahooProvider } from "@/lib/market/yahoo";
 import { fail, ok } from "@/lib/server/json";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/auth";
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
 
     stage = "读取行情数据";
     const fastMode = process.env.VERCEL && process.env.QFACTOR_FAST_ANALYSIS !== "false";
-    const provider = getMarketDataProvider();
+    const provider = fastMode ? new YahooProvider() : getMarketDataProvider();
     const fallbackMarketData = [
       createDemoQuote(symbol.display),
       createDemoHistory(symbol.display, 420),
