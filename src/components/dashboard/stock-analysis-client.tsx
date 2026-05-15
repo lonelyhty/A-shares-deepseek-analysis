@@ -25,7 +25,7 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
     setLoading(true);
     setError("");
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    const timeout = window.setTimeout(() => controller.abort(), 35_000);
 
     try {
       const response = await fetch("/api/analysis/run", {

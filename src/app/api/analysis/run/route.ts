@@ -7,6 +7,7 @@ import { fail, ok } from "@/lib/server/json";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/auth";
 import { getEntitlementState, incrementAnalysisUsage } from "@/lib/billing/entitlements";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { AnalysisReport } from "@/lib/types";
 
 const requestSchema = z.object({
@@ -14,9 +15,10 @@ const requestSchema = z.object({
   save: z.boolean().default(true),
 });
 
-export const maxDuration = 20;
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  let stage = "初始化";
   const { response, user, supabase } = await requireUser();
 
   if (response || !user) {
@@ -30,6 +32,10 @@ export async function POST(request: Request) {
   }
 
   try {
+    stage = "读取请求";
+    const body = requestSchema.parse(await request.json());
+
+    stage = "检查分析额度";
     const entitlement = await getEntitlementState(supabase, user);
 
     if (!entitlement.allowed) {
@@ -39,37 +45,47 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = requestSchema.parse(await request.json());
+    stage = "标准化股票代码";
     const symbol = normalizeSymbol(body.symbol);
+
+    stage = "读取行情数据";
     const provider = getMarketDataProvider();
     const [quote, history] = await Promise.all([
       provider.getQuote(symbol.display),
       provider.getHistory(symbol.display, 420),
     ]);
+
+    stage = "计算量化评分";
     const analysis = buildQuantAnalysis(quote, history);
+
+    stage = "生成 DeepSeek 报告";
     const aiReport = await generateDeepSeekReport(analysis);
     const report: AnalysisReport = { ...analysis, aiReport };
 
     if (body.save) {
-      await supabase.from("analysis_reports").insert({
-        user_id: user.id,
-        symbol: report.symbol,
-        name: report.quote.name,
-        signal: report.plan.signalLabel,
-        score: report.scores.total,
-        payload: report,
-      });
+      stage = "保存分析结果";
+      const db = createAdminClient() ?? supabase;
 
-      await supabase.from("usage_events").insert({
-        user_id: user.id,
-        event_type: "analysis.run",
-        metadata: {
+      await Promise.allSettled([
+        db.from("analysis_reports").insert({
+          user_id: user.id,
           symbol: report.symbol,
+          name: report.quote.name,
+          signal: report.plan.signalLabel,
           score: report.scores.total,
-          plan: entitlement.subscription.plan,
-          remainingBeforeRun: entitlement.remainingToday,
-        },
-      });
+          payload: report,
+        }),
+        db.from("usage_events").insert({
+          user_id: user.id,
+          event_type: "analysis.run",
+          metadata: {
+            symbol: report.symbol,
+            score: report.scores.total,
+            plan: entitlement.subscription.plan,
+            remainingBeforeRun: entitlement.remainingToday,
+          },
+        }),
+      ]);
 
       await incrementAnalysisUsage(supabase, user);
     }
@@ -84,6 +100,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "分析失败。");
+    const message = error instanceof Error ? error.message : "分析失败。";
+    return fail(`分析失败：${stage}。${message}`);
   }
 }
