@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { WatchlistClient } from "@/components/dashboard/watchlist-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isSupabaseConfigured } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { WatchlistItem } from "@/lib/types";
 import { Star } from "lucide-react";
@@ -19,7 +20,8 @@ export default async function WatchlistPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const { data } = await supabase
+      const dataClient = createAdminClient() ?? supabase;
+      const { data } = await dataClient
         .from("watchlist")
         .select("*")
         .eq("user_id", user.id)

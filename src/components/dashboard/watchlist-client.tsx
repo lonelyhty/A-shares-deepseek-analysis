@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeSymbol } from "@/lib/market/symbol";
 import type { WatchlistItem } from "@/lib/types";
 import {
   addLocalWatchlistItem,
   getLocalWatchlist,
+  mergeWatchlistItems,
+  normalizeWatchlistSymbol,
   removeLocalWatchlistItem,
 } from "@/lib/client-storage";
 
@@ -18,14 +21,12 @@ export function WatchlistClient({ items }: { items: WatchlistItem[] }) {
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [filter, setFilter] = useState("");
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     const load = () => {
       const local = getLocalWatchlist();
-      const merged = [...local, ...items].filter(
-        (item, index, arr) => arr.findIndex((current) => current.symbol === item.symbol) === index,
-      );
-      setList(merged);
+      setList(mergeWatchlistItems(local, items));
     };
 
     load();
@@ -39,13 +40,17 @@ export function WatchlistClient({ items }: { items: WatchlistItem[] }) {
 
   async function add(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedSymbol = symbol.trim().toUpperCase();
+    let normalizedSymbol = "";
 
-    if (!normalizedSymbol) {
+    try {
+      normalizedSymbol = normalizeSymbol(symbol).display;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "请输入正确的 A股代码。");
       return;
     }
 
-    const displayName = name.trim() || normalizedSymbol;
+    const existing = list.find((item) => normalizeWatchlistSymbol(item.symbol) === normalizedSymbol);
+    const displayName = name.trim() || existing?.name || normalizedSymbol;
     const saved = addLocalWatchlistItem({
       symbol: normalizedSymbol,
       name: displayName,
@@ -55,9 +60,10 @@ export function WatchlistClient({ items }: { items: WatchlistItem[] }) {
     setList((current) => [saved, ...current.filter((item) => item.symbol !== saved.symbol)]);
     setName("");
     setNote("");
+    setStatus("已保存到本地自选，正在同步云端。");
 
     try {
-      await fetch("/api/watchlist", {
+      const response = await fetch("/api/watchlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -66,36 +72,54 @@ export function WatchlistClient({ items }: { items: WatchlistItem[] }) {
           note: note.trim() || null,
         }),
       });
+
+      if (!response.ok) {
+        throw new Error("watchlist sync failed");
+      }
+
+      setStatus("已保存，并同步到云端。");
     } catch {
-      // Local storage remains available without Supabase.
+      setStatus("已保存到本地；云端同步失败时不影响本机使用。");
     }
   }
 
   async function remove(symbolToRemove: string) {
-    removeLocalWatchlistItem(symbolToRemove);
-    setList((current) => current.filter((item) => item.symbol !== symbolToRemove));
+    const normalizedSymbol = normalizeWatchlistSymbol(symbolToRemove);
+
+    removeLocalWatchlistItem(normalizedSymbol);
+    setList((current) => current.filter((item) => normalizeWatchlistSymbol(item.symbol) !== normalizedSymbol));
+    setStatus("已从本地自选移除。");
 
     try {
-      await fetch(`/api/watchlist?symbol=${encodeURIComponent(symbolToRemove)}`, {
+      const response = await fetch(`/api/watchlist?symbol=${encodeURIComponent(normalizedSymbol)}`, {
         method: "DELETE",
       });
+
+      if (!response.ok) {
+        throw new Error("watchlist delete failed");
+      }
+
+      setStatus("已从自选股移除，并同步到云端。");
     } catch {
-      // Local storage remains available without Supabase.
+      setStatus("已从本地移除；云端同步失败时稍后再试。");
     }
   }
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
-        <form onSubmit={add} className="grid gap-2 rounded-md border border-slate-200 bg-slate-50/80 p-3 md:grid-cols-[160px_180px_1fr_auto]">
-          <Input value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="股票代码，如 600519" />
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="名称，可选" />
-          <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="备注，可选，例如 等回踩 MA20" />
-          <Button type="submit">
-            <Plus className="h-4 w-4" />
-            添加
-          </Button>
-        </form>
+        <div className="space-y-2">
+          <form onSubmit={add} className="grid gap-2 rounded-md border border-slate-200 bg-slate-50/80 p-3 md:grid-cols-[160px_180px_1fr_auto]">
+            <Input value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="股票代码，如 600519" />
+            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="名称，可选" />
+            <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="备注，可选，例如 等回踩 MA20" />
+            <Button type="submit">
+              <Plus className="h-4 w-4" />
+              添加
+            </Button>
+          </form>
+          {status ? <div className="text-sm text-slate-500">{status}</div> : null}
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-cyan-700" />
           <Input className="pl-9" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索自选股" />

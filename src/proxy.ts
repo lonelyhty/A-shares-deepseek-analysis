@@ -30,7 +30,6 @@ export async function proxy(request: NextRequest) {
   const isProtected =
     request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/stock") ||
-    request.nextUrl.pathname.startsWith("/screener") ||
     request.nextUrl.pathname.startsWith("/watchlist") ||
     request.nextUrl.pathname.startsWith("/reports") ||
     request.nextUrl.pathname.startsWith("/settings");
@@ -57,4 +56,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-

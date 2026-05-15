@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpenText, CreditCard, Gauge, Settings, ShieldCheck, Star } from "lucide-react";
+import { BookOpenText, CreditCard, Gauge, Settings, ShieldCheck, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type ShellNavItem = {
@@ -13,7 +13,6 @@ export type ShellNavItem = {
 
 const icons = {
   gauge: Gauge,
-  screener: BarChart3,
   star: Star,
   reports: BookOpenText,
   billing: CreditCard,
@@ -55,7 +54,10 @@ export function MobileShellNav({ items }: { items: ShellNavItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-5 border-t border-cyan-200/30 bg-slate-950/95 text-white shadow-2xl lg:hidden">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-30 grid border-t border-cyan-200/30 bg-slate-950/95 text-white shadow-2xl lg:hidden"
+      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+    >
       {items.map((item) => {
         const Icon = icons[item.icon];
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

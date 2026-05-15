@@ -72,7 +72,7 @@ export default async function BillingPage({
           <CardContent className="grid gap-3 md:grid-cols-3">
             <PlanCard title="免费版" limit="每日 3 次分析" text="适合体验核心功能。" />
             <PlanCard title="专业版" limit="每日 50 次分析" text="适合个人投资研究和复盘。" />
-            <PlanCard title="旗舰版" limit="每日 200 次分析" text="适合重度研究、选股和团队使用。" />
+            <PlanCard title="旗舰版" limit="每日 200 次分析" text="适合重度研究、复盘和团队使用。" />
           </CardContent>
         </Card>
       </div>

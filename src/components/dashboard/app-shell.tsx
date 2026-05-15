@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 
 const userNav: ShellNavItem[] = [
   { href: "/dashboard", label: "驾驶舱", icon: "gauge" },
-  { href: "/screener", label: "选股器", icon: "screener" },
   { href: "/watchlist", label: "自选股", icon: "star" },
   { href: "/reports", label: "历史报告", icon: "reports" },
   { href: "/billing", label: "订阅", icon: "billing" },

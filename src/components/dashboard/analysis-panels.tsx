@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { addLocalWatchlistItem } from "@/lib/client-storage";
 import type { AnalysisReport } from "@/lib/types";
 import { compactNumber, formatNumber, formatPercent } from "@/lib/utils";
 
@@ -18,6 +19,9 @@ export function AnalysisPanels({
 }) {
   const [report, setReport] = useState(initialReport);
   const [loading, setLoading] = useState(false);
+  const [watchSaving, setWatchSaving] = useState(false);
+  const [watchSaved, setWatchSaved] = useState(false);
+  const [watchMessage, setWatchMessage] = useState("");
   const tone = useMemo(() => {
     if (report.scores.total >= 66) {
       return "red";
@@ -49,15 +53,39 @@ export function AnalysisPanels({
   }
 
   async function addWatchlist() {
-    await fetch("/api/watchlist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: report.symbol,
-        name: report.quote.name,
-        note: `${report.plan.signalLabel} ${report.scores.total}分`,
-      }),
+    const note = `${report.plan.signalLabel}，评分 ${report.scores.total}，建议仓位 ${report.plan.positionRange[0]}%-${report.plan.positionRange[1]}%`;
+
+    addLocalWatchlistItem({
+      symbol: report.symbol,
+      name: report.quote.name,
+      note,
     });
+
+    setWatchSaving(true);
+    setWatchSaved(true);
+    setWatchMessage("已保存到本地自选");
+
+    try {
+      const response = await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: report.symbol,
+          name: report.quote.name,
+          note,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("watchlist sync failed");
+      }
+
+      setWatchMessage("已加入自选，并同步到云端");
+    } catch {
+      setWatchMessage("已加入本地自选，云端稍后会继续同步");
+    } finally {
+      setWatchSaving(false);
+    }
   }
 
   return (
@@ -72,15 +100,18 @@ export function AnalysisPanels({
           </div>
           <p className="mt-1 text-sm text-slate-500">{report.aiReport.disclaimer}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={addWatchlist}>
-            <Plus className="h-4 w-4" />
-            自选
-          </Button>
-          <Button onClick={rerun} disabled={loading}>
-            <RefreshCcw className="h-4 w-4" />
-            {loading ? "分析中" : "重新分析"}
-          </Button>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={addWatchlist} disabled={watchSaving}>
+              <Plus className="h-4 w-4" />
+              {watchSaving ? "保存中" : watchSaved ? "已加入" : "自选"}
+            </Button>
+            <Button onClick={rerun} disabled={loading}>
+              <RefreshCcw className="h-4 w-4" />
+              {loading ? "分析中" : "重新分析"}
+            </Button>
+          </div>
+          {watchMessage ? <div className="text-xs text-slate-500">{watchMessage}</div> : null}
         </div>
       </div>
 
@@ -255,4 +286,3 @@ function PlanRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

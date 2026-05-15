@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeSymbol } from "@/lib/market/symbol";
 import type { AnalysisReport, StoredReport, WatchlistItem } from "@/lib/types";
 
 const REPORTS_KEY = "qfactor.local.reports";
@@ -55,14 +56,16 @@ export function addLocalWatchlistItem(input: {
   note?: string | null;
 }) {
   const items = getLocalWatchlist();
+  const symbol = normalizeWatchlistSymbol(input.symbol);
+  const existing = items.find((current) => normalizeWatchlistSymbol(current.symbol) === symbol);
   const item: WatchlistItem = {
-    id: `${input.symbol}-${Date.now()}`,
-    symbol: input.symbol,
-    name: input.name,
+    id: `${symbol}-${Date.now()}`,
+    symbol,
+    name: input.name || existing?.name || symbol,
     note: input.note ?? null,
     created_at: new Date().toISOString(),
   };
-  const next = [item, ...items.filter((current) => current.symbol !== input.symbol)];
+  const next = [item, ...items.filter((current) => normalizeWatchlistSymbol(current.symbol) !== symbol)];
 
   window.localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next));
   window.dispatchEvent(new Event("qfactor:watchlist"));
@@ -70,7 +73,8 @@ export function addLocalWatchlistItem(input: {
 }
 
 export function removeLocalWatchlistItem(symbol: string) {
-  const next = getLocalWatchlist().filter((item) => item.symbol !== symbol);
+  const normalizedSymbol = normalizeWatchlistSymbol(symbol);
+  const next = getLocalWatchlist().filter((item) => normalizeWatchlistSymbol(item.symbol) !== normalizedSymbol);
   window.localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next));
   window.dispatchEvent(new Event("qfactor:watchlist"));
 }
@@ -81,8 +85,46 @@ export function getLocalWatchlist(): WatchlistItem[] {
   }
 
   try {
-    return JSON.parse(window.localStorage.getItem(WATCHLIST_KEY) || "[]") as WatchlistItem[];
+    const items = JSON.parse(window.localStorage.getItem(WATCHLIST_KEY) || "[]") as WatchlistItem[];
+    return items
+      .map((item) => {
+        const symbol = normalizeWatchlistSymbol(item.symbol);
+        return {
+          ...item,
+          symbol,
+          name: item.name || symbol,
+          note: item.note ?? null,
+        };
+      })
+      .filter((item) => item.symbol);
   } catch {
     return [];
+  }
+}
+
+export function mergeWatchlistItems(...groups: WatchlistItem[][]) {
+  const bySymbol = new Map<string, WatchlistItem>();
+
+  groups.flat().forEach((item) => {
+    const symbol = normalizeWatchlistSymbol(item.symbol);
+    if (!symbol) {
+      return;
+    }
+    if (!bySymbol.has(symbol)) {
+      bySymbol.set(symbol, { ...item, symbol });
+    }
+  });
+
+  return Array.from(bySymbol.values()).sort(
+    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+  );
+}
+
+export function normalizeWatchlistSymbol(symbol: string) {
+  const value = String(symbol ?? "").trim().toUpperCase();
+  try {
+    return normalizeSymbol(value).display;
+  } catch {
+    return value;
   }
 }
