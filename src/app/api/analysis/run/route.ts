@@ -50,13 +50,24 @@ export async function POST(request: Request) {
 
     stage = "读取行情数据";
     const fastMode = process.env.VERCEL && process.env.QFACTOR_FAST_ANALYSIS !== "false";
-    const provider = fastMode ? null : getMarketDataProvider();
-    const [quote, history] = provider
-      ? await Promise.all([
+    const provider = getMarketDataProvider();
+    const fallbackMarketData = [
+      createDemoQuote(symbol.display),
+      createDemoHistory(symbol.display, 420),
+    ] as const;
+    const [quote, history] = fastMode
+      ? await withFallback(
+          Promise.all([
+            provider.getQuote(symbol.display),
+            provider.getHistory(symbol.display, 420),
+          ]),
+          fallbackMarketData,
+          2_500,
+        )
+      : await Promise.all([
           provider.getQuote(symbol.display),
           provider.getHistory(symbol.display, 420),
-        ])
-      : [createDemoQuote(symbol.display), createDemoHistory(symbol.display, 420)];
+        ]);
 
     stage = "计算量化评分";
     const analysis = buildQuantAnalysis(quote, history);
@@ -85,4 +96,11 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "分析失败。";
     return fail(`分析失败：${stage}。${message}`);
   }
+}
+
+function withFallback<T>(promise: Promise<T>, fallback: T, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise.catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+  ]);
 }
